@@ -1,43 +1,74 @@
-name: Build and Release iOS App
+name: iOS Build and Release
 
 on:
   push:
-    tags:
-      - 'v*' # This will trigger the workflow when you push a tag starting with 'v'
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
 
 jobs:
-  build_and_release:
+  build:
+    name: Build, Test, and Release
     runs-on: macos-latest
+
     steps:
-    - uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    - name: Set up Xcode
-      uses: maxim-lobanov/setup-xcode@v1
-      with:
-        xcode-version: latest-stable
+      - name: Unzip Xcode project
+        run: unzip "Cash App.xcodeproj.zip"
 
-    - name: Build IPA
-      run: |
-        xcodebuild archive -scheme "CashappSpoof" -archivePath $RUNNER_TEMP/CashappSpoof.xcarchive -sdk iphoneos
-        xcodebuild -exportArchive -archivePath $RUNNER_TEMP/CashappSpoof.xcarchive -exportOptionsPlist ExportOptions.plist -exportPath $RUNNER_TEMP/build
+      - name: Set Default Scheme
+        run: |
+          scheme="CashappSpoof"
+          echo $scheme > default
+          echo Using scheme: $scheme
 
-    - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ github.ref }}
-        release_name: Release ${{ github.ref }}
-        draft: false
-        prerelease: false
+      - name: Build
+        env:
+          scheme: ${{ 'CashappSpoof' }}
+          platform: ${{ 'iOS Simulator' }}
+        run: |
+          device=`xcrun xctrace list devices 2>&1 | grep -oE 'iPhone.*?[^\(]+' | head -1 | awk '{$1=$1;print}' | sed -e "s/ Simulator$//"`
+          xcodebuild build-for-testing -scheme "$scheme" -project "Cash App.xcodeproj" -destination "platform=$platform,name=$device"
 
-    - name: Upload IPA to Release
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ${{ runner.temp }}/build/CashappSpoof.ipa
-        asset_name: CashappSpoof.ipa
-        asset_content_type: application/octet-stream
+      - name: Check for tests and run if available
+        env:
+          scheme: ${{ 'CashappSpoof' }}
+          platform: ${{ 'iOS Simulator' }}
+        run: |
+          device=`xcrun xctrace list devices 2>&1 | grep -oE 'iPhone.*?[^\(]+' | head -1 | awk '{$1=$1;print}' | sed -e "s/ Simulator$//"`
+          if xcodebuild -scheme "$scheme" -project "Cash App.xcodeproj" -list | grep -q "Test"; then
+            echo "Tests found. Running tests..."
+            xcodebuild test-without-building -scheme "$scheme" -project "Cash App.xcodeproj" -destination "platform=$platform,name=$device"
+          else
+            echo "No tests found in the scheme. Skipping test step."
+          fi
+
+      - name: Build IPA
+        env:
+          scheme: ${{ 'CashappSpoof' }}
+        run: |
+          xcodebuild archive -scheme "$scheme" -project "Cash App.xcodeproj" -archivePath $RUNNER_TEMP/CashappSpoof.xcarchive -sdk iphoneos -configuration Release CODE_SIGNING_ALLOWED=NO
+          xcodebuild -exportArchive -archivePath $RUNNER_TEMP/CashappSpoof.xcarchive -exportOptionsPlist ExportOptions.plist -exportPath $RUNNER_TEMP/build
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.sha }}
+          release_name: Release ${{ github.sha }}
+          draft: false
+          prerelease: false
+
+      - name: Upload IPA to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ runner.temp }}/build/CashappSpoof.ipa
+          asset_name: CashappSpoof.ipa
+          asset_content_type: application/octet-stream
