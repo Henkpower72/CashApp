@@ -18,30 +18,24 @@ jobs:
       - name: Unzip Xcode project
         run: unzip "Cash App.xcodeproj.zip"
 
-      - name: List available schemes
-        run: xcodebuild -list -project "Cash App.xcodeproj"
-
       - name: Set Default Scheme
         run: |
-          scheme_list=$(xcodebuild -list -json -project "Cash App.xcodeproj" | tr -d "\n")
-          default=$(echo $scheme_list | ruby -e "require 'json'; puts JSON.parse(STDIN.gets)['project']['targets'][0]")
-          echo $default | cat >default
-          echo Using default scheme: $default
+          scheme="CashappSpoof"
+          echo $scheme > default
+          echo Using scheme: $scheme
 
       - name: Build
         env:
-          scheme: ${{ 'default' }}
+          scheme: ${{ 'CashappSpoof' }}
           platform: ${{ 'iOS Simulator' }}
         run: |
           device=`xcrun xctrace list devices 2>&1 | grep -oE 'iPhone.*?[^\(]+' | head -1 | awk '{$1=$1;print}' | sed -e "s/ Simulator$//"`
-          if [ $scheme = default ]; then scheme=$(cat default); fi
           xcodebuild build-for-testing -scheme "$scheme" -project "Cash App.xcodeproj" -destination "platform=$platform,name=$device"
 
       - name: Test
         env:
-          scheme: ${{ 'default' }}
+          scheme: ${{ 'CashappSpoof' }}
           platform: ${{ 'iOS Simulator' }}
         run: |
           device=`xcrun xctrace list devices 2>&1 | grep -oE 'iPhone.*?[^\(]+' | head -1 | awk '{$1=$1;print}' | sed -e "s/ Simulator$//"`
-          if [ $scheme = default ]; then scheme=$(cat default); fi
           xcodebuild test-without-building -scheme "$scheme" -project "Cash App.xcodeproj" -destination "platform=$platform,name=$device"
