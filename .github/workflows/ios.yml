@@ -18,12 +18,8 @@ jobs:
       - name: Unzip Xcode project
         run: unzip "Cash App.xcodeproj.zip"
 
-      - name: List directory contents
-        run: |
-          echo "Root directory:"
-          ls -la
-          echo "Cash App.xcodeproj directory:"
-          ls -la "Cash App.xcodeproj"
+      - name: List available schemes
+        run: xcodebuild -list -project "Cash App.xcodeproj"
 
       - name: Set Default Scheme
         run: |
