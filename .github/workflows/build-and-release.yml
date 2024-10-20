@@ -50,8 +50,11 @@ jobs:
         env:
           scheme: ${{ 'CashappSpoof' }}
         run: |
-          xcodebuild clean archive -scheme "$scheme" -project "Cash App.xcodeproj" -archivePath $RUNNER_TEMP/CashappSpoof.xcarchive -sdk iphoneos -configuration Release CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
-          xcodebuild -exportArchive -archivePath $RUNNER_TEMP/CashappSpoof.xcarchive -exportOptionsPlist ExportOptions.plist -exportPath $RUNNER_TEMP/build
+          xcodebuild archive -scheme "$scheme" -project "Cash App.xcodeproj" -archivePath $RUNNER_TEMP/CashappSpoof.xcarchive -sdk iphoneos -configuration Release CODE_SIGNING_ALLOWED=NO
+          mkdir Payload
+          cp -r $RUNNER_TEMP/CashappSpoof.xcarchive/Products/Applications/*.app Payload/
+          zip -r $RUNNER_TEMP/CashappSpoof.ipa Payload
+          rm -rf Payload
 
       - name: Create Release
         id: create_release
@@ -70,6 +73,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ runner.temp }}/build/CashappSpoof.ipa
+          asset_path: ${{ runner.temp }}/CashappSpoof.ipa
           asset_name: CashappSpoof.ipa
           asset_content_type: application/octet-stream
